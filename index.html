@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClickBando — Gestione Database</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0A0A0F;
+    --surface: #12121A;
+    --card: #1A1A26;
+    --border: #2A2A3E;
+    --accent: #6C63FF;
+    --accent-light: #8B84FF;
+    --accent-glow: rgba(108,99,255,0.15);
+    --green: #2ECC8F;
+    --red: #FF5A5A;
+    --yellow: #F5C842;
+    --text: #E8E8F0;
+    --muted: #888899;
+    --dim: #555566;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', system-ui, sans-serif; min-height: 100vh; }
+  input, textarea, button, select { font-family: inherit; }
+
+  /* NAV */
+  .nav { position: sticky; top: 0; z-index: 100; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 24px; height: 58px; }
+  .nav-logo { font-size: 18px; font-weight: 800; color: var(--accent); letter-spacing: -0.02em; margin-right: 12px; }
+  .nav-btn { padding: 6px 14px; border-radius: 8px; border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+  .nav-btn.active { background: var(--accent-glow); color: var(--accent-light); font-weight: 600; }
+  .nav-exit { margin-left: auto; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; }
+
+  /* CONTAINER */
+  .container { max-width: 680px; margin: 0 auto; padding: 32px 24px; }
+
+  /* VIEWS */
+  .view { display: none; flex-direction: column; gap: 24px; }
+  .view.active { display: flex; }
+
+  /* API KEY SCREEN */
+  .gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .gate-box { max-width: 400px; width: 100%; text-align: center; }
+  .gate-icon { width: 56px; height: 56px; border-radius: 16px; background: var(--accent); display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 24px; }
+  .gate-title { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
+  .gate-sub { font-size: 14px; color: var(--muted); margin-bottom: 32px; line-height: 1.6; }
+  .gate-input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-size: 14px; outline: none; margin-bottom: 12px; transition: border-color 0.15s; }
+  .gate-input:focus { border-color: var(--accent); }
+  .gate-btn { width: 100%; padding: 13px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+  .gate-btn:hover { opacity: 0.9; }
+  .gate-note { font-size: 11px; color: var(--dim); margin-top: 16px; }
+
+  /* HOME GRID */
+  .home-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+  .home-sub { font-size: 15px; color: var(--muted); }
+  .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .home-card { padding: 20px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; text-align: left; transition: all 0.15s; width: 100%; }
+  .home-card:hover { border-color: var(--accent); background: var(--card); }
+  .home-card-icon { font-size: 24px; margin-bottom: 8px; }
+  .home-card-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .home-card-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .stats { display: flex; gap: 12px; }
+  .stat { flex: 1; padding: 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+  .stat-val { font-size: 22px; font-weight: 800; }
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* FORM */
+  .form-title { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+  .form-title-row { display: flex; align-items: center; justify-content: space-between; }
+  .cancel-edit { font-size: 12px; color: var(--muted); background: transparent; border: none; cursor: pointer; }
+  .section { display: flex; flex-direction: column; gap: 8px; }
+  .section-label { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .field-label { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+  .field-input { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; width: 100%; outline: none; transition: border-color 0.15s; }
+  .field-input:focus { border-color: var(--accent); }
+  textarea.field-input { resize: vertical; min-height: 80px; }
+  .partner-hint { font-size: 12px; color: var(--yellow); margin-top: 4px; }
+
+  /* TYPE TOGGLE */
+  .type-toggle { display: flex; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); width: fit-content; }
+  .type-btn { padding: 10px 28px; background: transparent; color: var(--muted); border: none; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; letter-spacing: 0.03em; }
+  .type-btn.active { background: var(--accent); color: #fff; font-weight: 700; }
+
+  /* CHIPS */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .chip.active { border-color: var(--accent); background: var(--accent-glow); color: var(--accent-light); }
+  .chip.consulente.active { border-color: var(--green); background: rgba(46,204,143,0.12); color: var(--green); }
+
+  /* SUBMIT AREA */
+  .submit-row { display: flex; gap: 10px; }
+  .btn-primary { flex: 1; padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:disabled { background: var(--border); cursor: not-allowed; opacity: 1; }
+  .btn-secondary { padding: 14px 20px; background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+
+  /* STATUS */
+  .status { padding: 12px 16px; border-radius: 10px; font-size: 14px; }
+  .status.ok { background: rgba(46,204,143,0.12); color: var(--green); border: 1px solid rgba(46,204,143,0.25); }
+  .status.err { background: rgba(255,90,90,0.12); color: var(--red); border: 1px solid rgba(255,90,90,0.25); }
+
+  /* LIST */
+  .list-header { display: flex; align-items: center; gap: 10px; }
+  .list-title { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; flex: 1; }
+  .list-count { font-size: 14px; color: var(--muted); font-weight: 400; }
+  .btn-sm { padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; }
+  .btn-sm.accent { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .search-input { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 14px; width: 100%; outline: none; }
+  .records-list { display: flex; flex-direction: column; gap: 6px; }
+  .record-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; transition: all 0.15s; }
+  .record-row:hover { border-color: var(--accent); background: var(--card); }
+  .record-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .record-info { flex: 1; min-width: 0; }
+  .record-name { font-size: 14px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .record-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .record-badge { font-size: 11px; padding: 3px 8px; border-radius: 12px; flex-shrink: 0; }
+  .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- API KEY GATE -->
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <div class="gate-icon">⚡</div>
+    <div class="gate-title">ClickBando</div>
+    <div class="gate-sub">Inserisci la tua Airtable Personal Access Token per accedere al database clienti e partner.</div>
+    <input class="gate-input" type="password" id="apiKeyInput" placeholder="pat_xxxxxxxxxxxxxxxx..." />
+    <button class="gate-btn" onclick="doLogin()">Accedi →</button>
+    <div class="gate-note">La chiave non viene salvata su server — rimane solo nel browser</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <nav class="nav">
+    <div class="nav-logo">⚡ ClickBando</div>
+    <button class="nav-btn active" id="nav-home" onclick="showView('home')">Home</button>
+    <button class="nav-btn" id="nav-add" onclick="showView('add')">+ Aggiungi</button>
+    <button class="nav-btn" id="nav-list" onclick="openList()">📋 Lista</button>
+    <button class="nav-exit" onclick="doLogout()">Esci</button>
+  </nav>
+
+  <div class="container">
+
+    <!-- HOME VIEW -->
+    <div class="view active" id="view-home">
+      <div>
+        <div class="home-title">Benvenuto 👋</div>
+        <div class="home-sub" style="margin-top:6px">Gestisci clienti e partner nel database ClickBando.</div>
+      </div>
+      <div class="home-grid">
+        <button class="home-card" onclick="openAddType('Cliente')">
+          <div class="home-card-icon">➕</div>
+          <div class="home-card-title">Aggiungi Cliente</div>
+          <div class="home-card-sub">Nuovo lead o cliente diretto</div>
+        </button>
+        <button class="home-card" onclick="openAddType('Partner')">
+          <div class="home-card-icon">🤝</div>
+          <div class="home-card-title">Aggiungi Partner</div>
+          <div class="home-card-sub">Nuovo partner di canale</div>
+        </button>
+        <button class="home-card" onclick="openList()">
+          <div class="home-card-icon">📋</div>
+          <div class="home-card-title">Visualizza Lista</div>
+          <div class="home-card-sub">Tutti i record in Airtable</div>
+        </button>
+        <button class="home-card" onclick="loadRecords(); openList()">
+          <div class="home-card-icon">🔄</div>
+          <div class="home-card-title">Aggiorna Dati</div>
+          <div class="home-card-sub">Ricarica da Airtable</div>
+        </button>
+      </div>
+      <div class="stats" id="homeStats" style="display:none">
+        <div class="stat"><div class="stat-val" id="statTotal" style="color:var(--accent)">0</div><div class="stat-label">Totale record</div></div>
+        <div class="stat"><div class="stat-val" id="statPartner" style="color:var(--yellow)">0</div><div class="stat-label">Partner</div></div>
+        <div class="stat"><div class="stat-val" id="statClienti" style="color:var(--green)">0</div><div class="stat-label">Clienti</div></div>
+      </div>
+    </div>
+
+    <!-- ADD/EDIT VIEW -->
+    <div class="view" id="view-add">
+      <div class="form-title-row">
+        <div class="form-title" id="formTitle">Nuovo record</div>
+        <button class="cancel-edit" id="cancelEditBtn" style="display:none" onclick="cancelEdit()">← Annulla modifica</button>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Tipo di record</div>
+        <div class="type-toggle">
+          <button class="type-btn active" id="typeCliente" onclick="setType('Cliente')">Cliente</button>
+          <button class="type-btn" id="typePartner" onclick="setType('Partner')">Partner</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Nome</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label class="field-label">Nome</label>
+          <input class="field-input" type="text" id="fieldName" placeholder="Es: Andrea Nuti" oninput="updatePartnerHint()" />
+          <div class="partner-hint" id="partnerHint" style="display:none"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Segnalatore / Consulente</div>
+        <div class="chips" id="chipsConsulente"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Regioni operative</div>
+        <div class="chips" id="chipsRegioni"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Interessi di investimento</div>
+        <div class="chips" id="chipsInvestimenti"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Agevolazioni di interesse</div>
+        <div class="chips" id="chipsAgevolazioni"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Note (dettagli per matching)</div>
+        <label class="field-label">Note</label>
+        <textarea class="field-input" id="fieldNotes" placeholder="Es: Vuole Odoo, solo fondo perduto, cerca voucher cybersecurity..."></textarea>
+      </div>
+
+      <div id="formStatus" style="display:none"></div>
+
+      <div class="submit-row">
+        <button class="btn-primary" id="saveBtn" onclick="handleSave()">Aggiungi Cliente</button>
+        <button class="btn-secondary" onclick="cancelForm()">Annulla</button>
+      </div>
+    </div>
+
+    <!-- LIST VIEW -->
+    <div class="view" id="view-list">
+      <div class="list-header">
+        <div class="list-title">Database <span class="list-count" id="listCount"></span></div>
+        <button class="btn-sm" onclick="loadRecords()">🔄 Aggiorna</button>
+        <button class="btn-sm accent" onclick="openAddType('Cliente')">+ Nuovo</button>
+      </div>
+      <input class="search-input" type="text" id="searchInput" placeholder="🔍 Cerca per nome..." oninput="renderList()" />
+      <div id="listStatus" style="display:none"></div>
+      <div class="records-list" id="recordsList">
+        <div class="empty-state">Clicca "Aggiorna" per caricare i record da Airtable.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const BASE = 'appAhDd368v7Yq2qx';
+const TABLE = 'tblfUGG7T4VqkvGcS';
+const F = {
+  name: 'fldNjmv1K945qwLe2',
+  notes: 'fldRpXUHvNYwv6SGR',
+  provincia: 'fldrDknf9l7KNTCoo',
+  investimento: 'fldfuoboyi2QoY7cC',
+  agevolazione: 'fld9MNr1TIBgOo4yk',
+  segnalatore: 'fldVsIOg2hyyIlcGS',
+};
+
+const CONSULENTI = ['Carlo Alberto','Alessandro','CSA','ClickBando','Select','Francesco','Mao Garro'];
+const INVESTIMENTI = ['Digitale','Marketing','Green','Internazionalizzazione','Innovazione R&D','Beni strumentali','Formazione','Liquidità','Personale','Fiere ed eventi','Certificazioni'];
+const AGEVOLAZIONI = ['Voucher CCIAA','Fondo perduto','Tasso agevolato','Voucher cybersecurity','Garanzia','Contributo a fondo perduto','Finanziamento agevolato'];
+const REGIONI = ['Abruzzo','Basilicata','Calabria','Campania','Emilia Romagna','Friuli Venezia Giulia','Lazio','Liguria','Lombardia','Marche','Molise','Piemonte','Puglia','Sardegna','Sicilia','Toscana','Trentino Alto Adige','Umbria',"Valle d'Aosta",'Veneto','Nazionale'];
+
+let apiKey = '';
+let currentType = 'Cliente';
+let selectedConsulente = '';
+let selectedRegioni = [];
+let selectedInvestimenti = [];
+let selectedAgevolazioni = [];
+let editRecordId = null;
+let allRecords = [];
+
+// --- AUTH ---
+function doLogin() {
+  const k = document.getElementById('apiKeyInput').value.trim();
+  if (!k) return;
+  apiKey = k;
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  buildChips();
+}
+
+function doLogout() {
+  apiKey = '';
+  document.getElementById('gate').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('apiKeyInput').value = '';
+}
+
+document.getElementById('apiKeyInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+// --- NAVIGATION ---
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-' + name).classList.add('active');
+}
+
+function openList() {
+  showView('list');
+  if (allRecords.length === 0) loadRecords();
+}
+
+function openAddType(type) {
+  resetForm();
+  setType(type);
+  showView('add');
+  document.getElementById('nav-add').classList.add('active');
+  document.getElementById('nav-home').classList.remove('active');
+}
+
+// --- CHIPS ---
+function buildChips() {
+  buildChipGroup('chipsConsulente', CONSULENTI, 'consulente', () => selectedConsulente, v => {
+    selectedConsulente = selectedConsulente === v ? '' : v;
+    buildChips();
+  });
+  buildChipGroup('chipsRegioni', REGIONI, '', () => selectedRegioni, v => {
+    toggle(selectedRegioni, v); buildChips();
+  });
+  buildChipGroup('chipsInvestimenti', INVESTIMENTI, '', () => selectedInvestimenti, v => {
+    toggle(selectedInvestimenti, v); buildChips();
+  });
+  buildChipGroup('chipsAgevolazioni', AGEVOLAZIONI, '', () => selectedAgevolazioni, v => {
+    toggle(selectedAgevolazioni, v); buildChips();
+  });
+}
+
+function buildChipGroup(containerId, options, extraClass, getSelected, onToggle) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  options.forEach(opt => {
+    const sel = getSelected();
+    const isActive = Array.isArray(sel) ? sel.includes(opt) : sel === opt;
+    const btn = document.createElement('button');
+    btn.className = 'chip' + (extraClass ? ' ' + extraClass : '') + (isActive ? ' active' : '');
+    btn.textContent = opt;
+    btn.onclick = () => onToggle(opt);
+    el.appendChild(btn);
+  });
+}
+
+function toggle(arr, val) {
+  const i = arr.indexOf(val);
+  if (i >= 0) arr.splice(i, 1); else arr.push(val);
+}
+
+// --- TYPE ---
+function setType(t) {
+  currentType = t;
+  document.getElementById('typeCliente').classList.toggle('active', t === 'Cliente');
+  document.getElementById('typePartner').classList.toggle('active', t === 'Partner');
+  document.getElementById('saveBtn').textContent = editRecordId ? 'Aggiorna record' : 'Aggiungi ' + t;
+  document.getElementById('fieldName').placeholder = t === 'Partner' ? 'Es: Dario Cucchiar (senza PARTNER, viene aggiunto auto)' : 'Es: Andrea Nuti';
+  updatePartnerHint();
+}
+
+function updatePartnerHint() {
+  const hint = document.getElementById('partnerHint');
+  const name = document.getElementById('fieldName').value.trim();
+  if (currentType === 'Partner' && name) {
+    hint.style.display = 'block';
+    hint.textContent = '→ Verrà salvato come: "' + name + ' PARTNER"';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+// --- FORM ---
+function resetForm() {
+  editRecordId = null;
+  currentType = 'Cliente';
+  selectedConsulente = '';
+  selectedRegioni = [];
+  selectedInvestimenti = [];
+  selectedAgevolazioni = [];
+  document.getElementById('fieldName').value = '';
+  document.getElementById('fieldNotes').value = '';
+  document.getElementById('formTitle').textContent = 'Nuovo record';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  document.getElementById('saveBtn').textContent = 'Aggiungi Cliente';
+  document.getElementById('formStatus').style.display = 'none';
+  document.getElementById('typeCliente').classList.add('active');
+  document.getElementById('typePartner').classList.remove('active');
+  updatePartnerHint();
+  buildChips();
+}
+
+function cancelForm() {
+  resetForm();
+  showView('home');
+}
+
+function cancelEdit() {
+  resetForm();
+  showView('list');
+}
+
+function airtableName(name, type) {
+  if (type !== 'Partner') return name;
+  const up = name.toUpperCase();
+  if (up.includes('PARTNER')) return name;
+  return name + ' PARTNER';
+}
+
+async function handleSave() {
+  const name = document.getElementById('fieldName').value.trim();
+  if (!name) { showFormStatus('err', 'Il nome è obbligatorio.'); return; }
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Salvataggio...';
+  showFormStatus(null, '');
+
+  const fields = {
+    [F.name]: airtableName(name, currentType),
+    [F.notes]: document.getElementById('fieldNotes').value,
+    [F.provincia]: [...selectedRegioni],
+    [F.investimento]: [...selectedInvestimenti],
+    [F.agevolazione]: [...selectedAgevolazioni],
+  };
+  if (selectedConsulente) fields[F.segnalatore] = selectedConsulente;
+
+  try {
+    const url = editRecordId
+      ? `https://api.airtable.com/v0/${BASE}/${TABLE}/${editRecordId}`
+      : `https://api.airtable.com/v0/${BASE}/${TABLE}`;
+    const method = editRecordId ? 'PATCH' : 'POST';
+    const body = editRecordId ? { fields } : { records: [{ fields }] };
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Errore API Airtable');
+    }
+
+    showFormStatus('ok', editRecordId ? '✓ Record aggiornato con successo!' : '✓ ' + currentType + ' aggiunto con successo!');
+    const nameAdded = document.getElementById('fieldName').value.trim();
+    resetForm();
+    if (allRecords.length > 0) loadRecords();
+    // Keep status visible after reset
+    setTimeout(() => {
+      document.getElementById('formStatus').className = 'status ok';
+      document.getElementById('formStatus').style.display = 'block';
+      document.getElementById('formStatus').textContent = '✓ ' + (editRecordId ? 'Record aggiornato' : currentType + ' aggiunto') + '!';
+    }, 50);
+  } catch(e) {
+    showFormStatus('err', '✗ ' + e.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = editRecordId ? 'Aggiorna record' : 'Aggiungi ' + currentType;
+}
+
+function showFormStatus(type, msg) {
+  const el = document.getElementById('formStatus');
+  if (!type) { el.style.display = 'none'; return; }
+  el.className = 'status ' + type;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// --- LIST ---
+async function loadRecords() {
+  const listStatus = document.getElementById('listStatus');
+  listStatus.className = 'status ok';
+  listStatus.textContent = 'Caricamento...';
+  listStatus.style.display = 'block';
+  document.getElementById('recordsList').innerHTML = '<div class="empty-state">Caricamento record da Airtable...</div>';
+
+  let all = [], offset = null;
+  try {
+    do {
+      let url = `https://api.airtable.com/v0/${BASE}/${TABLE}?pageSize=100`;
+      if (offset) url += '&offset=' + encodeURIComponent(offset);
+      const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + apiKey } });
+      if (!res.ok) throw new Error('Errore lettura: ' + res.status);
+      const data = await res.json();
+      all = all.concat(data.records);
+      offset = data.offset || null;
+    } while (offset);
+
+    allRecords = all;
+    updateStats();
+    listStatus.style.display = 'none';
+    renderList();
+  } catch(e) {
+    listStatus.className = 'status err';
+    listStatus.textContent = '✗ ' + e.message;
+    document.getElementById('recordsList').innerHTML = '';
+  }
+}
+
+function updateStats() {
+  const partners = allRecords.filter(r => (r.fields[F.name] || '').includes('PARTNER'));
+  document.getElementById('statTotal').textContent = allRecords.length;
+  document.getElementById('statPartner').textContent = partners.length;
+  document.getElementById('statClienti').textContent = allRecords.length - partners.length;
+  document.getElementById('homeStats').style.display = 'flex';
+  document.getElementById('listCount').textContent = '(' + allRecords.length + ' record)';
+}
+
+function renderList() {
+  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  const filtered = allRecords.filter(r => !q || (r.fields[F.name] || '').toLowerCase().includes(q));
+  const container = document.getElementById('recordsList');
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state">' + (q ? 'Nessun risultato per "' + q + '"' : 'Nessun record trovato.') + '</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  filtered.forEach(r => {
+    const name = r.fields[F.name] || '—';
+    const isPartner = name.includes('PARTNER');
+    const segnalatore = r.fields[F.segnalatore] || '';
+    const regioni = (r.fields[F.provincia] || []).slice(0, 2).join(', ');
+    const investimenti = (r.fields[F.investimento] || []).slice(0, 2).join(', ');
+    const meta = [segnalatore, regioni, investimenti].filter(Boolean).join(' · ');
+
+    const row = document.createElement('div');
+    row.className = 'record-row';
+    row.innerHTML = `
+      <div class="record-dot" style="background:${isPartner ? 'var(--yellow)' : 'var(--green)'}"></div>
+      <div class="record-info">
+        <div class="record-name">${escHtml(name)}</div>
+        <div class="record-meta">${escHtml(meta) || '—'}</div>
+      </div>
+      <div class="record-badge" style="background:${isPartner ? 'rgba(245,200,66,0.15)' : 'rgba(46,204,143,0.15)'};color:${isPartner ? 'var(--yellow)' : 'var(--green)'}">
+        ${isPartner ? 'PARTNER' : 'CLIENTE'}
+      </div>
+    `;
+    row.onclick = () => openEditRecord(r);
+    container.appendChild(row);
+  });
+}
+
+function openEditRecord(record) {
+  const f = record.fields;
+  const name = f[F.name] || '';
+  const isPartner = name.toUpperCase().includes('PARTNER');
+
+  editRecordId = record.id;
+  currentType = isPartner ? 'Partner' : 'Cliente';
+  selectedConsulente = f[F.segnalatore] || '';
+  selectedRegioni = [...(f[F.provincia] || [])];
+  selectedInvestimenti = [...(f[F.investimento] || [])];
+  selectedAgevolazioni = [...(f[F.agevolazione] || [])];
+
+  document.getElementById('fieldName').value = name.replace(/ PARTNER$/i, '').replace(/^PARTNER /i, '');
+  document.getElementById('fieldNotes').value = f[F.notes] || '';
+  document.getElementById('formTitle').textContent = 'Modifica record';
+  document.getElementById('cancelEditBtn').style.display = 'block';
+  document.getElementById('saveBtn').textContent = 'Aggiorna record';
+
+  document.getElementById('typeCliente').classList.toggle('active', !isPartner);
+  document.getElementById('typePartner').classList.toggle('active', isPartner);
+
+  updatePartnerHint();
+  buildChips();
+  showView('add');
+  document.getElementById('nav-add').classList.add('active');
+}
+
+function escHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
